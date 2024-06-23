@@ -1,0 +1,6 @@
+name: '${name}'
+version: '${version}'
+main: "${group}.BlockCommandsPlugin"
+api-version: '1.21'
+softdepend:
+  - PlaceholderAPI
