@@ -8,6 +8,7 @@ import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -25,12 +26,17 @@ import revxrsal.commands.annotation.Subcommand;
 import revxrsal.commands.bukkit.annotation.CommandPermission;
 
 import java.util.Arrays;
+import java.util.Set;
 import java.util.function.Function;
 
 // I hate how this is named, but I have a model called BlockCommand :\
 @Command("blockcommand")
 @CommandPermission("blockcommands.command")
 public class BlockCommandCommand {
+    private static final Set<Material> BLOCKED_MATERIALS = Set.of(
+            Material.WATER, Material.LAVA
+    );
+    private static final String INVALID_BLOCK = Chat.fmt("&cYou cannot add commands to a liquid. Please look at a solid block.");
     private static final String NO_BLOCK = Chat.fmt("&cYou must be looking at a block to use &n%s");
     private static final String ALREADY_SIMILAR_COMMAND = Chat.fmt("&cThis block already has a similar command: &n%s");
     private static final String COMMANDS_EMPTY = Chat.fmt("&cThis block has no commands.");
@@ -52,7 +58,7 @@ public class BlockCommandCommand {
     public void help(@NotNull Player sender) {
         sender.sendMessage(Chat.fmt("&a/blockcommand add <command> &7- Add a command to the block you're looking at"));
         sender.sendMessage(Chat.fmt("&a/blockcommand remove <index> &7- Remove a command from the block you're looking at - get the index from /blockcommand list"));
-        sender.sendMessage(Chat.fmt("&a/blockcommand list &7- List all commands for the block you're looking at"));
+        sender.sendMessage(Chat.fmt("&a/blockcommand list &7- List the commands for the block you're looking at"));
     }
 
     @Subcommand("add")
@@ -63,6 +69,11 @@ public class BlockCommandCommand {
         Block targetBlock = sender.getTargetBlock(null, 5);
         if (targetBlock.isEmpty()) {
             sender.sendMessage(NO_BLOCK.formatted("/blockcommand add"));
+            return;
+        }
+
+        if (BLOCKED_MATERIALS.contains(targetBlock.getType())) {
+            sender.sendMessage(INVALID_BLOCK);
             return;
         }
 
