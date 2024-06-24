@@ -11,3 +11,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
       - name: Build with Gradle
         run: ./gradlew shadowJar
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Package
+          path: build/libs

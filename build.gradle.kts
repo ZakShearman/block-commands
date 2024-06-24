@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "pink.zak.minecraft.blockcommands"
-version = "0.1.0"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
