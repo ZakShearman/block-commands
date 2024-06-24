@@ -170,7 +170,7 @@ public class BlockCommandCommand {
                     .formatted(targetBlockLoc.getBlockX(), targetBlockLoc.getBlockY(), targetBlockLoc.getBlockZ(), "\"%s\"".formatted(command.command()));
 
             componentBuilder.append("\n")
-                    .append("%s ".formatted(i))
+                    .append("%s ".formatted(i + 1))
                     .append("[")
 
                     .append(clickHereComponent).color(ChatColor.RED).underlined(true).event(new ClickEvent(ClickEvent.Action.RUN_COMMAND, clickCommand))
