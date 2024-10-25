@@ -12,6 +12,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pink.zak.minecraft.blockcommands.BlockCommandsPlugin;
@@ -22,6 +23,7 @@ import pink.zak.minecraft.blockcommands.utils.EnumUtils;
 import pink.zak.minecraft.blockcommands.utils.Pair;
 import revxrsal.commands.annotation.Command;
 import revxrsal.commands.annotation.DefaultFor;
+import revxrsal.commands.annotation.SecretCommand;
 import revxrsal.commands.annotation.Subcommand;
 import revxrsal.commands.bukkit.annotation.CommandPermission;
 
@@ -36,25 +38,29 @@ public class BlockCommandCommand {
     private static final String ALREADY_SIMILAR_COMMAND = Chat.fmt("&cThis block already has a similar command: &n%s");
     private static final String COMMANDS_EMPTY = Chat.fmt("&cThis block has no commands.");
     private static final String INDEX_TOO_SMALL = Chat.fmt("&cIndex input must be 1 or greater.");
+    private static final String NO_BOUND_COMMANDS = Chat.fmt("&cYou must add a command before setting a block's properties");
     private static final Function<Integer, String> INDEX_TOO_LARGE = input -> Chat.fmt("&cIndex must be smaller than " + input);
     private static final Function<String, String> COMMAND_NOT_MATCHED = input -> Chat.fmt("&cCouldn't match the command '%s'".formatted(input));
-    private static final Function <String, String> NO_BLOCK = command -> Chat.fmt("&cYou must be looking at a block to use &n" + command);
+    private static final Function<String, String> NO_BLOCK = command -> Chat.fmt("&cYou must be looking at a block to use &n" + command);
 
     private final BlockCommandsPlugin plugin;
-    private final NamespacedKey dataKey;
+    private final NamespacedKey commandDataKey;
+    private final NamespacedKey cancelInteractDataKey;
 
     public BlockCommandCommand(@NotNull BlockCommandsPlugin plugin) {
         this.plugin = plugin;
-        this.dataKey = plugin.getDataKey();
+        this.commandDataKey = plugin.getCommandDataKey();
+        this.cancelInteractDataKey = plugin.getCancelInteractDataKey();
     }
 
     @Subcommand({"help"})
     @DefaultFor("blockcommand")
     @CommandPermission("blockcommands.command")
     public void help(@NotNull Player sender) {
+        sender.sendMessage(Chat.fmt("&a/blockcommand info &7- List the commands for the block you're looking at"));
         sender.sendMessage(Chat.fmt("&a/blockcommand add <console/player> <left/right_click> <command> &7- Add a command to the block you're looking at"));
-        sender.sendMessage(Chat.fmt("&a/blockcommand remove <index> &7- Remove a command from the block you're looking at - get the index from /blockcommand list"));
-        sender.sendMessage(Chat.fmt("&a/blockcommand list &7- List the commands for the block you're looking at"));
+        sender.sendMessage(Chat.fmt("&a/blockcommand remove <index> &7- Remove a command from the block you're looking at - get the index from /blockcommand info"));
+        sender.sendMessage(Chat.fmt("&a/blockcommand set cancelinteract <true/false> &7- Set whether the block should cancel interactions (e.g. sign edit)"));
     }
 
     @Subcommand("add")
@@ -77,7 +83,7 @@ public class BlockCommandCommand {
         String commandWithoutSlash = inputCommand.startsWith("/") ? inputCommand.substring(1) : inputCommand;
 
         PersistentDataContainer container = new CustomBlockData(targetBlock, this.plugin);
-        BlockCommand[] currentCommands = container.getOrDefault(this.dataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
+        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
 
         for (BlockCommand currentCommand : currentCommands) {
             if (currentCommand.command().equalsIgnoreCase(commandWithoutSlash)) {
@@ -89,7 +95,7 @@ public class BlockCommandCommand {
         BlockCommand[] newCommands = Arrays.copyOf(currentCommands, currentCommands.length + 1);
         newCommands[newCommands.length - 1] = new BlockCommand(execType, clickType, commandWithoutSlash);
 
-        container.set(this.dataKey, CustomDataTypes.BLOCK_COMMAND, newCommands);
+        container.set(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, newCommands);
         sender.sendMessage(Chat.fmt("&aSuccessfully added command &n%s&r &ato %s. It now has %s commands",
                 inputCommand, EnumUtils.friendlyName(targetBlock.getType()), newCommands.length));
     }
@@ -105,7 +111,7 @@ public class BlockCommandCommand {
         }
 
         PersistentDataContainer container = new CustomBlockData(targetBlock, this.plugin);
-        BlockCommand[] currentCommands = container.getOrDefault(this.dataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
+        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
         int currentCommandsLen = currentCommands.length;
 
         if (currentCommandsLen == 0) {
@@ -136,18 +142,19 @@ public class BlockCommandCommand {
         this.removeCommandAtIndex(sender, currentCommands, container, index);
     }
 
-    @Subcommand("list")
-    @CommandPermission("blockcommands.command.list")
-    public void list(@NotNull Player sender) {
+    @Subcommand("info")
+    @CommandPermission("blockcommands.command.info")
+    public void info(@NotNull Player sender) {
         Block targetBlock = sender.getTargetBlock(null, 5);
-        Location targetBlockLoc = targetBlock.getLocation();
+        Location targetBlockLock = targetBlock.getLocation();
         if (targetBlock.isEmpty()) {
-            sender.sendMessage(NO_BLOCK.apply("/blockcommand list"));
+            sender.sendMessage(NO_BLOCK.apply("/blockcommand info"));
             return;
         }
 
         PersistentDataContainer container = new CustomBlockData(targetBlock, this.plugin);
-        BlockCommand[] currentCommands = container.getOrDefault(this.dataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
+        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
+        boolean cancelInteract = container.getOrDefault(this.cancelInteractDataKey, PersistentDataType.BYTE, (byte) 0) == 1;
 
         if (currentCommands.length == 0) {
             sender.sendMessage(COMMANDS_EMPTY);
@@ -156,15 +163,17 @@ public class BlockCommandCommand {
 
         Location blockLoc = targetBlock.getLocation();
         ComponentBuilder componentBuilder = new ComponentBuilder()
-                .append("Commands for block %s (x: %s, y: %s, z: %s)".formatted(EnumUtils.friendlyName(targetBlock.getBlockData().getMaterial()),
-                        blockLoc.getBlockX(), blockLoc.getBlockY(), blockLoc.getBlockZ())).color(ChatColor.GREEN);
+                .append("Info for block %s (x: %s, y: %s, z: %s)".formatted(EnumUtils.friendlyName(targetBlock.getType()),
+                        blockLoc.getBlockX(), blockLoc.getBlockY(), blockLoc.getBlockZ())).color(ChatColor.GREEN)
+                .append("\nCancel Interact: " + cancelInteract)
+                .append("\nCommands:").color(ChatColor.GREEN);
 
         for (int i = 0; i < currentCommands.length; i++) {
             BlockCommand command = currentCommands[i];
 
             TextComponent clickHereComponent = new TextComponent("remove");
-            String clickCommand = "/blockcommand listremove %s %s %s %s"
-                    .formatted(targetBlockLoc.getBlockX(), targetBlockLoc.getBlockY(), targetBlockLoc.getBlockZ(), "\"%s\"".formatted(command.command()));
+            String clickCommand = "/blockcommand inforemove %s %s %s %s"
+                    .formatted(targetBlockLock.getBlockX(), targetBlockLock.getBlockY(), targetBlockLock.getBlockZ(), "\"%s\"".formatted(command.command()));
 
             componentBuilder.append("\n")
                     .append("%s ".formatted(i + 1))
@@ -183,9 +192,10 @@ public class BlockCommandCommand {
         sender.spigot().sendMessage(componentBuilder.create());
     }
 
-    @Subcommand("listremove")
+    @Subcommand("inforemove")
+    @SecretCommand
     @CommandPermission("blockcommands.command.remove")
-    public void listRemove(@NotNull Player sender, int x, int y, int z, @NotNull String command) {
+    public void infoRemove(@NotNull Player sender, int x, int y, int z, @NotNull String command) {
         Block block = sender.getWorld().getBlockAt(x, y, z);
         if (block.isEmpty()) {
             sender.sendMessage(Chat.fmt("&cCouldn't find block at x: %s, y: %s, z: %s".formatted(x, y, z)));
@@ -193,7 +203,7 @@ public class BlockCommandCommand {
         }
 
         PersistentDataContainer container = new CustomBlockData(block, this.plugin);
-        BlockCommand[] currentCommands = container.getOrDefault(this.dataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
+        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
 
         if (currentCommands.length == 0) {
             sender.sendMessage(COMMANDS_EMPTY);
@@ -209,8 +219,29 @@ public class BlockCommandCommand {
         this.removeCommandAtIndex(sender, currentCommands, container, foundCommand.getLeft());
     }
 
-    @Subcommand("set thing")
-    public void doThing(@NotNull Player sender) {}
+    @Subcommand("set cancelinteract")
+    @CommandPermission("blockcommands.command.set.cancelinteract")
+    public void cancelInteract(Player sender, boolean value) {
+        Block block = sender.getTargetBlock(null, 5);
+
+        if (block.isEmpty()) {
+            sender.sendMessage(NO_BLOCK.apply("/blockcommand set cancelinteract"));
+            return;
+        }
+
+        PersistentDataContainer container = new CustomBlockData(block, this.plugin);
+        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
+
+        if (currentCommands.length == 0) {
+            sender.sendMessage(NO_BOUND_COMMANDS);
+            return;
+        }
+
+        container.set(this.cancelInteractDataKey, PersistentDataType.BYTE, (byte) (value ? 1 : 0));
+
+        String action = value ? "now" : "no longer";
+        sender.sendMessage(Chat.fmt("&a%s will %s cancel interactions.".formatted(EnumUtils.friendlyName(block.getType()), action)));
+    }
 
     private void removeCommandAtIndex(@NotNull Player sender, @NotNull BlockCommand[] currentCommands,
                                       @NotNull PersistentDataContainer container, int index) {
@@ -220,9 +251,9 @@ public class BlockCommandCommand {
         BlockCommand[] newCommands = Arrays.copyOf(currentCommands, currentCommands.length - 1);
 
         if (newCommands.length == 0) {
-            container.remove(this.dataKey);
+            container.remove(this.commandDataKey);
         } else {
-            container.set(this.dataKey, CustomDataTypes.BLOCK_COMMAND, newCommands);
+            container.set(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, newCommands);
         }
 
         sender.sendMessage(Chat.fmt("&aSuccessfully removed %s command &n/%s&r &afrom block. It now has %s commands",
