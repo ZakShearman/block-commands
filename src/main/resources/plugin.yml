@@ -4,3 +4,7 @@ main: "${group}.BlockCommandsPlugin"
 api-version: '1.17'
 softdepend:
   - PlaceholderAPI
+
+authors:
+  - 'Nuzzles11'
+  - 'Thyamix'
