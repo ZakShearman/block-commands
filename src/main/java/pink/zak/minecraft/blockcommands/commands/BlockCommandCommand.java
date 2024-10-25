@@ -57,8 +57,8 @@ public class BlockCommandCommand {
     @CommandPermission("blockcommands.command")
     public void help(@NotNull Player sender) {
         sender.sendMessage(Chat.fmt("&a/blockcommand add <console/player> <left/right_click> <command> &7- Add a command to the block you're looking at"));
-        sender.sendMessage(Chat.fmt("&a/blockcommand remove <index> &7- Remove a command from the block you're looking at - get the index from /blockcommand list"));
-        sender.sendMessage(Chat.fmt("&a/blockcommand list &7- List the commands for the block you're looking at"));
+        sender.sendMessage(Chat.fmt("&a/blockcommand remove <index> &7- Remove a command from the block you're looking at - get the index from /blockcommand info"));
+        sender.sendMessage(Chat.fmt("&a/blockcommand info &7- List the commands for the block you're looking at"));
     }
 
     @Subcommand("add")
@@ -140,13 +140,13 @@ public class BlockCommandCommand {
         this.removeCommandAtIndex(sender, currentCommands, container, index);
     }
 
-    @Subcommand("list")
-    @CommandPermission("blockcommands.command.list")
-    public void list(@NotNull Player sender) {
+    @Subcommand("info")
+    @CommandPermission("blockcommands.command.info")
+    public void info(@NotNull Player sender) {
         Block targetBlock = sender.getTargetBlock(null, 5);
-        Location targetBlockLoc = targetBlock.getLocation();
+        Location targetBlockLock = targetBlock.getLocation();
         if (targetBlock.isEmpty()) {
-            sender.sendMessage(NO_BLOCK.apply("/blockcommand list"));
+            sender.sendMessage(NO_BLOCK.apply("/blockcommand info"));
             return;
         }
 
@@ -169,8 +169,8 @@ public class BlockCommandCommand {
             BlockCommand command = currentCommands[i];
 
             TextComponent clickHereComponent = new TextComponent("remove");
-            String clickCommand = "/blockcommand listremove %s %s %s %s"
-                    .formatted(targetBlockLoc.getBlockX(), targetBlockLoc.getBlockY(), targetBlockLoc.getBlockZ(), "\"%s\"".formatted(command.command()));
+            String clickCommand = "/blockcommand inforemove %s %s %s %s"
+                    .formatted(targetBlockLock.getBlockX(), targetBlockLock.getBlockY(), targetBlockLock.getBlockZ(), "\"%s\"".formatted(command.command()));
 
             componentBuilder.append("\n")
                     .append("%s ".formatted(i + 1))
@@ -189,9 +189,9 @@ public class BlockCommandCommand {
         sender.spigot().sendMessage(componentBuilder.create());
     }
 
-    @Subcommand("listremove")
+    @Subcommand("inforemove")
     @CommandPermission("blockcommands.command.remove")
-    public void listRemove(@NotNull Player sender, int x, int y, int z, @NotNull String command) {
+    public void infoRemove(@NotNull Player sender, int x, int y, int z, @NotNull String command) {
         Block block = sender.getWorld().getBlockAt(x, y, z);
         if (block.isEmpty()) {
             sender.sendMessage(Chat.fmt("&cCouldn't find block at x: %s, y: %s, z: %s".formatted(x, y, z)));
