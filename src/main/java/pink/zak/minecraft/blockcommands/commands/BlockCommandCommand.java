@@ -33,12 +33,12 @@ import java.util.function.Function;
 @CommandPermission("blockcommands.command")
 public class BlockCommandCommand {
     private static final String INVALID_BLOCK = Chat.fmt("&cYou cannot add commands to a liquid. Please look at a solid block.");
-    private static final String NO_BLOCK = Chat.fmt("&cYou must be looking at a block to use &n%s");
     private static final String ALREADY_SIMILAR_COMMAND = Chat.fmt("&cThis block already has a similar command: &n%s");
     private static final String COMMANDS_EMPTY = Chat.fmt("&cThis block has no commands.");
     private static final String INDEX_TOO_SMALL = Chat.fmt("&cIndex input must be 1 or greater.");
     private static final Function<Integer, String> INDEX_TOO_LARGE = input -> Chat.fmt("&cIndex must be smaller than " + input);
     private static final Function<String, String> COMMAND_NOT_MATCHED = input -> Chat.fmt("&cCouldn't match the command '%s'".formatted(input));
+    private static final Function <String, String> NO_BLOCK = command -> Chat.fmt("&cYou must be looking at a block to use &n" + command);
 
     private final BlockCommandsPlugin plugin;
     private final NamespacedKey dataKey;
@@ -64,7 +64,7 @@ public class BlockCommandCommand {
 
         Block targetBlock = sender.getTargetBlock(null, 5);
         if (targetBlock.isEmpty()) {
-            sender.sendMessage(NO_BLOCK.formatted("/blockcommand add"));
+            sender.sendMessage(NO_BLOCK.apply("/blockcommand add"));
             return;
         }
 
@@ -100,7 +100,7 @@ public class BlockCommandCommand {
     public void remove(@NotNull Player sender, String input) {
         Block targetBlock = sender.getTargetBlock(null, 5);
         if (targetBlock.isEmpty()) {
-            sender.sendMessage(NO_BLOCK.formatted("/blockcommand remove"));
+            sender.sendMessage(NO_BLOCK.apply("/blockcommand remove"));
             return;
         }
 
@@ -142,7 +142,7 @@ public class BlockCommandCommand {
         Block targetBlock = sender.getTargetBlock(null, 5);
         Location targetBlockLoc = targetBlock.getLocation();
         if (targetBlock.isEmpty()) {
-            sender.sendMessage(NO_BLOCK.formatted("/blockcommand list"));
+            sender.sendMessage(NO_BLOCK.apply("/blockcommand list"));
             return;
         }
 
@@ -208,6 +208,9 @@ public class BlockCommandCommand {
 
         this.removeCommandAtIndex(sender, currentCommands, container, foundCommand.getLeft());
     }
+
+    @Subcommand("set thing")
+    public void doThing(@NotNull Player sender) {}
 
     private void removeCommandAtIndex(@NotNull Player sender, @NotNull BlockCommand[] currentCommands,
                                       @NotNull PersistentDataContainer container, int index) {
