@@ -19,7 +19,7 @@ public final class BlockCommandsPlugin extends JavaPlugin {
     private static boolean PAPI_ENABLED;
 
     private final NamespacedKey commandDataKey = new NamespacedKey(this, "blockCommandData");
-    private final NamespacedKey interactPropertyDataKey = new NamespacedKey(this, "interactPropertyCommandData");
+    private final NamespacedKey cancelInteractDataKey = new NamespacedKey(this, "cancelInteractData");
 
     @Override
     public void onEnable() {
@@ -76,7 +76,7 @@ public final class BlockCommandsPlugin extends JavaPlugin {
         return this.commandDataKey;
     }
 
-    public NamespacedKey getInteractPropertyDataKey() {
-        return this.interactPropertyDataKey;
+    public NamespacedKey getCancelInteractDataKey() {
+        return this.cancelInteractDataKey;
     }
 }

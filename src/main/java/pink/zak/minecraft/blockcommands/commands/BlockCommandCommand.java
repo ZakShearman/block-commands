@@ -23,6 +23,7 @@ import pink.zak.minecraft.blockcommands.utils.EnumUtils;
 import pink.zak.minecraft.blockcommands.utils.Pair;
 import revxrsal.commands.annotation.Command;
 import revxrsal.commands.annotation.DefaultFor;
+import revxrsal.commands.annotation.SecretCommand;
 import revxrsal.commands.annotation.Subcommand;
 import revxrsal.commands.bukkit.annotation.CommandPermission;
 
@@ -44,21 +45,22 @@ public class BlockCommandCommand {
 
     private final BlockCommandsPlugin plugin;
     private final NamespacedKey commandDataKey;
-    private final NamespacedKey interactPropertyDataKey;
+    private final NamespacedKey cancelInteractDataKey;
 
     public BlockCommandCommand(@NotNull BlockCommandsPlugin plugin) {
         this.plugin = plugin;
         this.commandDataKey = plugin.getCommandDataKey();
-        this.interactPropertyDataKey = plugin.getInteractPropertyDataKey();
+        this.cancelInteractDataKey = plugin.getCancelInteractDataKey();
     }
 
     @Subcommand({"help"})
     @DefaultFor("blockcommand")
     @CommandPermission("blockcommands.command")
     public void help(@NotNull Player sender) {
+        sender.sendMessage(Chat.fmt("&a/blockcommand info &7- List the commands for the block you're looking at"));
         sender.sendMessage(Chat.fmt("&a/blockcommand add <console/player> <left/right_click> <command> &7- Add a command to the block you're looking at"));
         sender.sendMessage(Chat.fmt("&a/blockcommand remove <index> &7- Remove a command from the block you're looking at - get the index from /blockcommand info"));
-        sender.sendMessage(Chat.fmt("&a/blockcommand info &7- List the commands for the block you're looking at"));
+        sender.sendMessage(Chat.fmt("&a/blockcommand set cancelinteract <true/false> &7- Set whether the block should cancel interactions (e.g. sign edit)"));
     }
 
     @Subcommand("add")
@@ -152,7 +154,7 @@ public class BlockCommandCommand {
 
         PersistentDataContainer container = new CustomBlockData(targetBlock, this.plugin);
         BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
-        boolean cancelInteract = container.getOrDefault(this.interactPropertyDataKey, PersistentDataType.BYTE, (byte) 0) == 1;
+        boolean cancelInteract = container.getOrDefault(this.cancelInteractDataKey, PersistentDataType.BYTE, (byte) 0) == 1;
 
         if (currentCommands.length == 0) {
             sender.sendMessage(COMMANDS_EMPTY);
@@ -190,6 +192,7 @@ public class BlockCommandCommand {
     }
 
     @Subcommand("inforemove")
+    @SecretCommand
     @CommandPermission("blockcommands.command.remove")
     public void infoRemove(@NotNull Player sender, int x, int y, int z, @NotNull String command) {
         Block block = sender.getWorld().getBlockAt(x, y, z);
@@ -233,7 +236,7 @@ public class BlockCommandCommand {
             return;
         }
 
-        container.set(this.interactPropertyDataKey, PersistentDataType.BYTE, (byte) (value ? 1 : 0));
+        container.set(this.cancelInteractDataKey, PersistentDataType.BYTE, (byte) (value ? 1 : 0));
 
         String action = value ? "now" : "no longer";
         sender.sendMessage(Chat.fmt("&a%s will %s cancel interactions.".formatted(EnumUtils.friendlyName(block.getType()), action)));
