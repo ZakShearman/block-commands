@@ -16,13 +16,13 @@ repositories {
     maven("https://oss.sonatype.org/content/groups/public/")
     maven("https://repo.extendedclip.com/content/repositories/placeholderapi/") // PlaceholderAPI
 
-    maven("https://hub.jeff-media.com/nexus/repository/jeff-media-public/") // MorePersistentDataTypes
+    maven("https://repo.jeff-media.com/public") // MorePersistentDataTypes, custom-block-data
 
     maven("https://jitpack.io") // Lamp
 }
 
 dependencies {
-    compileOnly("org.spigotmc:spigot-api:1.21-R0.1-SNAPSHOT")
+    compileOnly("org.spigotmc:spigot-api:1.17.1-R0.1-SNAPSHOT")
 
     compileOnly("org.jetbrains:annotations:24.1.0")
 
@@ -32,8 +32,8 @@ dependencies {
 
     compileOnly("me.clip:placeholderapi:2.11.6")
 
-    implementation("com.jeff_media:MorePersistentDataTypes:2.4.0")
-    implementation("com.jeff-media:custom-block-data:2.2.2")
+    implementation("com.jeff-media:MorePersistentDataTypes:2.4.0")
+    implementation("com.jeff-media:custom-block-data:2.2.3")
 }
 
 val targetJavaVersion = 17
@@ -70,7 +70,7 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 tasks.withType<RunServer> {
-    minecraftVersion("1.21")
+    minecraftVersion("1.21.1")
 }
 
 tasks.withType(xyz.jpenilla.runtask.task.AbstractRun::class) {

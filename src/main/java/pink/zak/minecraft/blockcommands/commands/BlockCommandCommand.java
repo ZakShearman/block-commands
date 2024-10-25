@@ -183,7 +183,7 @@ public class BlockCommandCommand {
                     .append("\n  Exec As: " + command.execType());
         }
 
-        sender.spigot().sendMessage(componentBuilder.build());
+        sender.spigot().sendMessage(componentBuilder.create());
     }
 
     @Subcommand("listremove")
