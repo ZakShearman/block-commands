@@ -38,7 +38,7 @@ public class BlockCommandCommand {
     private static final String ALREADY_SIMILAR_COMMAND = Chat.fmt("&cThis block already has a similar command: &n%s");
     private static final String COMMANDS_EMPTY = Chat.fmt("&cThis block has no commands.");
     private static final String INDEX_TOO_SMALL = Chat.fmt("&cIndex input must be 1 or greater.");
-    private static final String NO_BOUND_COMMANDS = Chat.fmt("&cYou must add a command first before setting a property");
+    private static final String NO_BOUND_COMMANDS = Chat.fmt("&cYou must add a command before setting a block's properties");
     private static final Function<Integer, String> INDEX_TOO_LARGE = input -> Chat.fmt("&cIndex must be smaller than " + input);
     private static final Function<String, String> COMMAND_NOT_MATCHED = input -> Chat.fmt("&cCouldn't match the command '%s'".formatted(input));
     private static final Function<String, String> NO_BLOCK = command -> Chat.fmt("&cYou must be looking at a block to use &n" + command);
@@ -163,9 +163,10 @@ public class BlockCommandCommand {
 
         Location blockLoc = targetBlock.getLocation();
         ComponentBuilder componentBuilder = new ComponentBuilder()
-                .append("Commands for block %s (x: %s, y: %s, z: %s)".formatted(EnumUtils.friendlyName(targetBlock.getBlockData().getMaterial()),
+                .append("Info for block %s (x: %s, y: %s, z: %s)".formatted(EnumUtils.friendlyName(targetBlock.getType()),
                         blockLoc.getBlockX(), blockLoc.getBlockY(), blockLoc.getBlockZ())).color(ChatColor.GREEN)
-                .append("\nCancel Interact: " + cancelInteract);
+                .append("\nCancel Interact: " + cancelInteract)
+                .append("\nCommands:").color(ChatColor.GREEN);
 
         for (int i = 0; i < currentCommands.length; i++) {
             BlockCommand command = currentCommands[i];
