@@ -18,7 +18,8 @@ import java.util.Arrays;
 public final class BlockCommandsPlugin extends JavaPlugin {
     private static boolean PAPI_ENABLED;
 
-    private final NamespacedKey dataKey = new NamespacedKey(this, "blockCommandData");
+    private final NamespacedKey commandDataKey = new NamespacedKey(this, "blockCommandData");
+    private final NamespacedKey interactPropertyDataKey = new NamespacedKey(this, "interactPropertyCommandData");
 
     @Override
     public void onEnable() {
@@ -71,7 +72,11 @@ public final class BlockCommandsPlugin extends JavaPlugin {
         return PAPI_ENABLED;
     }
 
-    public @NotNull NamespacedKey getDataKey() {
-        return this.dataKey;
+    public @NotNull NamespacedKey getCommandDataKey() {
+        return this.commandDataKey;
+    }
+
+    public NamespacedKey getInteractPropertyDataKey() {
+        return this.interactPropertyDataKey;
     }
 }

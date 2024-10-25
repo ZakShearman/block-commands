@@ -24,7 +24,7 @@ public class BlockClickListener implements Listener {
 
     public BlockClickListener(@NotNull BlockCommandsPlugin plugin) {
         this.plugin = plugin;
-        this.dataKey = plugin.getDataKey();
+        this.dataKey = plugin.getCommandDataKey();
     }
 
     @EventHandler
