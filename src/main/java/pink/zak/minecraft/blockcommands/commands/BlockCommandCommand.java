@@ -19,6 +19,7 @@ import pink.zak.minecraft.blockcommands.BlockCommandsPlugin;
 import pink.zak.minecraft.blockcommands.model.BlockCommand;
 import pink.zak.minecraft.blockcommands.utils.Chat;
 import pink.zak.minecraft.blockcommands.utils.CustomDataTypes;
+import pink.zak.minecraft.blockcommands.utils.EnumUtils;
 import pink.zak.minecraft.blockcommands.utils.Pair;
 import revxrsal.commands.annotation.Command;
 import revxrsal.commands.annotation.DefaultFor;
@@ -94,7 +95,8 @@ public class BlockCommandCommand {
         newCommands[newCommands.length - 1] = new BlockCommand(execType, clickType, commandWithoutSlash);
 
         container.set(this.dataKey, CustomDataTypes.BLOCK_COMMAND, newCommands);
-        sender.sendMessage(Chat.fmt("&aSuccessfully added command &n%s&r &ato block. It now has %s commands", inputCommand, newCommands.length));
+        sender.sendMessage(Chat.fmt("&aSuccessfully added command &n%s&r &ato %s. It now has %s commands",
+                inputCommand, EnumUtils.friendlyName(targetBlock.getType()), newCommands.length));
     }
 
     // input can be either an index (1+) or an exact match of the command
@@ -159,7 +161,7 @@ public class BlockCommandCommand {
 
         Location blockLoc = targetBlock.getLocation();
         ComponentBuilder componentBuilder = new ComponentBuilder()
-                .append("Commands for block %s (x: %s, y: %s, z: %s)".formatted(targetBlock.getBlockData().getMaterial().name(),
+                .append("Commands for block %s (x: %s, y: %s, z: %s)".formatted(EnumUtils.friendlyName(targetBlock.getBlockData().getMaterial()),
                         blockLoc.getBlockX(), blockLoc.getBlockY(), blockLoc.getBlockZ())).color(ChatColor.GREEN);
 
         for (int i = 0; i < currentCommands.length; i++) {
@@ -180,7 +182,7 @@ public class BlockCommandCommand {
 
             componentBuilder.append("\n  Command: /" + command.command())
                     .append("\n  Click Type: " + command.clickType().friendlyName())
-                    .append("\n  Exec As: " + command.execType());
+                    .append("\n  Exec As: " + EnumUtils.friendlyName(command.execType()));
         }
 
         sender.spigot().sendMessage(componentBuilder.create());
