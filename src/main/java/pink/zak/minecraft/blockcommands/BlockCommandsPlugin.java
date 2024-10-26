@@ -10,8 +10,12 @@ import org.jetbrains.annotations.NotNull;
 import pink.zak.minecraft.blockcommands.commands.BlockCommandCommand;
 import pink.zak.minecraft.blockcommands.listener.BlockClickListener;
 import pink.zak.minecraft.blockcommands.model.BlockCommand;
-import revxrsal.commands.bukkit.BukkitCommandHandler;
-import revxrsal.commands.exception.CommandErrorException;
+import revxrsal.commands.Lamp;
+import revxrsal.commands.bukkit.BukkitLamp;
+import revxrsal.commands.bukkit.actor.BukkitCommandActor;
+import revxrsal.commands.node.ExecutionContext;
+import revxrsal.commands.parameter.ParameterType;
+import revxrsal.commands.stream.MutableStringStream;
 
 import java.util.Arrays;
 
@@ -36,25 +40,26 @@ public final class BlockCommandsPlugin extends JavaPlugin {
     }
 
     private void registerCommands() {
-        BukkitCommandHandler handler = BukkitCommandHandler.create(this);
+        Lamp<BukkitCommandActor> lamp = BukkitLamp.builder(this)
+                .parameterTypes(builder -> {
+                    builder.addParameterType(BlockCommand.BlockClickType.class, new ParameterType<BukkitCommandActor, BlockCommand.BlockClickType>() {
+                        @Override
+                        public BlockCommand.BlockClickType parse(@NotNull MutableStringStream inputStream, @NotNull ExecutionContext<@NotNull BukkitCommandActor> context) {
+                            String input = inputStream.readString();
+                            return BlockCommand.BlockClickType.fromIdentifier(input);
+                        }
+                    });
+                })
+                .suggestionProviders(providers -> {
+                    providers.addProvider(BlockCommand.BlockClickType.class, context -> {
+                        return Arrays.stream(BlockCommand.BlockClickType.values()).map(BlockCommand.BlockClickType::identifier).toList();
+                    });
+                })
+                .build();
 
-        handler.getAutoCompleter().registerParameterSuggestions(BlockCommand.BlockClickType.class, (list, commandActor, executableCommand) -> {
-            return Arrays.stream(BlockCommand.BlockClickType.values()).map(BlockCommand.BlockClickType::identifier).toList();
-        });
-
-        handler.registerValueResolver(BlockCommand.BlockClickType.class, context -> {
-            String input = context.pop();
-
-            BlockCommand.BlockClickType clickType = BlockCommand.BlockClickType.fromIdentifier(input);
-            if (clickType == null) throw new CommandErrorException("'%s' is not a valid click type.".formatted(input));
-            return clickType;
-        });
-
-        handler.register(
+        lamp.register(
                 new BlockCommandCommand(this)
         );
-
-        handler.registerBrigadier();
     }
 
     private void registerListeners() {

@@ -27,8 +27,8 @@ dependencies {
     compileOnly("org.jetbrains:annotations:24.1.0")
 
     // Lamp - Command Framework
-    implementation("com.github.Revxrsal.Lamp:common:3.2.1")
-    implementation("com.github.Revxrsal.Lamp:bukkit:3.2.1")
+    implementation("io.github.revxrsal:lamp.common:4.0.0-beta.19")
+    implementation("io.github.revxrsal:lamp.bukkit:4.0.0-beta.19")
 
     compileOnly("me.clip:placeholderapi:2.11.6")
 

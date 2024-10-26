@@ -21,10 +21,7 @@ import pink.zak.minecraft.blockcommands.utils.Chat;
 import pink.zak.minecraft.blockcommands.utils.CustomDataTypes;
 import pink.zak.minecraft.blockcommands.utils.EnumUtils;
 import pink.zak.minecraft.blockcommands.utils.Pair;
-import revxrsal.commands.annotation.Command;
-import revxrsal.commands.annotation.DefaultFor;
-import revxrsal.commands.annotation.SecretCommand;
-import revxrsal.commands.annotation.Subcommand;
+import revxrsal.commands.annotation.*;
 import revxrsal.commands.bukkit.annotation.CommandPermission;
 
 import java.util.Arrays;
@@ -53,8 +50,14 @@ public class BlockCommandCommand {
         this.cancelInteractDataKey = plugin.getCancelInteractDataKey();
     }
 
+    @Command("blockcommand")
+    @CommandPermission("blockcommands.command")
+    public void root(@NotNull Player sender) {
+        this.help(sender);
+    }
+
     @Subcommand({"help"})
-    @DefaultFor("blockcommand")
+    @Usage("blockcommand")
     @CommandPermission("blockcommands.command")
     public void help(@NotNull Player sender) {
         sender.sendMessage(Chat.fmt("&a/blockcommand info &7- List the commands for the block you're looking at"));

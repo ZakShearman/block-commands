@@ -5,7 +5,7 @@ Supports PlaceholderAPI
 
 # Prerequisites
 
-- Spigot/Paper 1.17.1+
+- Spigot/Paper 1.19.4+
 - Java 17+
 
 # Optional Additions
