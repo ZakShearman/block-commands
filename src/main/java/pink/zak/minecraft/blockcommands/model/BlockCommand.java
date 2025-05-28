@@ -1,29 +1,16 @@
 package pink.zak.minecraft.blockcommands.model;
 
-import org.bukkit.configuration.serialization.ConfigurationSerializable;
+import org.bukkit.block.Block;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Map;
+import java.util.UUID;
 
-public record BlockCommand(@NotNull ExecType execType, @NotNull BlockClickType clickType, @NotNull String command) implements ConfigurationSerializable {
+public record BlockCommand(@NotNull UUID id, int x, int y, int z, @NotNull UUID worldId, @NotNull ExecType execType,
+                           @NotNull BlockClickType clickType, @NotNull String command) {
 
-    @NotNull
-    @Override
-    public Map<String, Object> serialize() {
-        return Map.of(
-                "command", this.command,
-                "execType", this.execType.ordinal(),
-                "clickType", this.clickType.ordinal()
-        );
-    }
-
-    public static BlockCommand deserialize(@NotNull Map<String, Object> map) {
-        return new BlockCommand(
-                ExecType.values()[(int) map.get("execType")],
-                BlockClickType.values()[(int) map.get("clickType")],
-                (String) map.get("command")
-        );
+    public BlockCommand(@NotNull Block block, @NotNull ExecType execType, @NotNull BlockClickType clickType, @NotNull String command) {
+        this(UUID.randomUUID(), block.getX(), block.getY(), block.getZ(), block.getWorld().getUID(), execType, clickType, command);
     }
 
     public enum ExecType {

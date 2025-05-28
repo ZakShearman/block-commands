@@ -1,31 +1,35 @@
 package pink.zak.minecraft.blockcommands.commands;
 
-import com.jeff_media.customblockdata.CustomBlockData;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
-import org.bukkit.persistence.PersistentDataContainer;
-import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pink.zak.minecraft.blockcommands.BlockCommandsPlugin;
 import pink.zak.minecraft.blockcommands.model.BlockCommand;
+import pink.zak.minecraft.blockcommands.model.BlockSettings;
+import pink.zak.minecraft.blockcommands.model.CustomBlock;
+import pink.zak.minecraft.blockcommands.repository.Repository;
 import pink.zak.minecraft.blockcommands.utils.Chat;
-import pink.zak.minecraft.blockcommands.utils.CustomDataTypes;
 import pink.zak.minecraft.blockcommands.utils.EnumUtils;
 import pink.zak.minecraft.blockcommands.utils.Pair;
 import revxrsal.commands.annotation.*;
 import revxrsal.commands.bukkit.annotation.CommandPermission;
 
-import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 import java.util.function.Function;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 // I hate how this is named, but I have a model called BlockCommand :\
 @Command("blockcommand")
@@ -41,11 +45,16 @@ public class BlockCommandCommand {
     private static final Function<String, String> NO_BLOCK = command -> Chat.fmt("&cYou must be looking at a block to use &n" + command);
 
     private final BlockCommandsPlugin plugin;
+    private final Repository repository;
+    private final Logger logger;
+
     private final NamespacedKey commandDataKey;
     private final NamespacedKey cancelInteractDataKey;
 
-    public BlockCommandCommand(@NotNull BlockCommandsPlugin plugin) {
+    public BlockCommandCommand(@NotNull BlockCommandsPlugin plugin, @NotNull Repository repository) {
         this.plugin = plugin;
+        this.repository = repository;
+        this.logger = plugin.getLogger();
         this.commandDataKey = plugin.getCommandDataKey();
         this.cancelInteractDataKey = plugin.getCancelInteractDataKey();
     }
@@ -85,22 +94,34 @@ public class BlockCommandCommand {
         // Remove the slash from the start if it's there
         String commandWithoutSlash = inputCommand.startsWith("/") ? inputCommand.substring(1) : inputCommand;
 
-        PersistentDataContainer container = new CustomBlockData(targetBlock, this.plugin);
-        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
+        this.repository.ListBlockCommands(targetBlock)
+                .thenAcceptAsync(blockCommands -> {
+                    for (BlockCommand blockCommand : blockCommands) {
+                        if (blockCommand.command().equalsIgnoreCase(commandWithoutSlash)) {
+                            sender.sendMessage(ALREADY_SIMILAR_COMMAND.formatted(inputCommand));
+                            return;
+                        }
+                    }
 
-        for (BlockCommand currentCommand : currentCommands) {
-            if (currentCommand.command().equalsIgnoreCase(commandWithoutSlash)) {
-                sender.sendMessage(ALREADY_SIMILAR_COMMAND.formatted(inputCommand));
-                return;
-            }
-        }
+                    BlockCommand newCommand = new BlockCommand(targetBlock, execType, clickType, commandWithoutSlash);
 
-        BlockCommand[] newCommands = Arrays.copyOf(currentCommands, currentCommands.length + 1);
-        newCommands[newCommands.length - 1] = new BlockCommand(execType, clickType, commandWithoutSlash);
-
-        container.set(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, newCommands);
-        sender.sendMessage(Chat.fmt("&aSuccessfully added command &n%s&r &ato %s. It now has %s commands",
-                inputCommand, EnumUtils.friendlyName(targetBlock.getType()), newCommands.length));
+                    this.repository.CreateDefaultCustomBlockIfNotExists(new CustomBlock(
+                            targetBlock.getX(), targetBlock.getY(), targetBlock.getZ(), targetBlock.getWorld().getUID(),
+                            new BlockSettings(false), List.of()
+                    )).exceptionally(throwable -> {
+                        sender.sendMessage(Chat.fmt("&cFailed to create custom block for %s. Check the console for more details".formatted(EnumUtils.friendlyName(targetBlock.getType()))));
+                        throwable.printStackTrace();
+                        return null;
+                    });
+                    this.repository.CreateBlockCommand(newCommand).thenAccept(unused -> {
+                        sender.sendMessage(Chat.fmt("&aSuccessfully added command &n%s&r &ato %s. It now has %s commands",
+                                inputCommand, EnumUtils.friendlyName(targetBlock.getType()), blockCommands.size() + 1));
+                    }).exceptionally(throwable -> {
+                        sender.sendMessage(Chat.fmt("&cFailed to add command '%s'. Check the console for more details".formatted(throwable.getMessage())));
+                        throwable.printStackTrace();
+                        return null;
+                    });
+                });
     }
 
     // input can be either an index (1+) or an exact match of the command
@@ -113,36 +134,36 @@ public class BlockCommandCommand {
             return;
         }
 
-        PersistentDataContainer container = new CustomBlockData(targetBlock, this.plugin);
-        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
-        int currentCommandsLen = currentCommands.length;
-
-        if (currentCommandsLen == 0) {
-            sender.sendMessage(COMMANDS_EMPTY);
-            return;
-        }
-
-        int index;
-        try {
-            index = Integer.parseInt(input) - 1;
-            if (index < 0) {
-                sender.sendMessage(INDEX_TOO_SMALL);
-                return;
-            } else if (index > currentCommandsLen) {
-                sender.sendMessage(INDEX_TOO_LARGE.apply(currentCommandsLen));
-            }
-        } catch (NumberFormatException ex) {
-            // find an exact match of the command if possible
-            Pair<Integer, BlockCommand> matchedCommand = this.findByCommand(currentCommands, input);
-            if (matchedCommand == null) {
-                sender.sendMessage(COMMAND_NOT_MATCHED.apply(input));
+        this.repository.ListBlockCommands(targetBlock).thenAcceptAsync(blockCommands -> {
+            int currentCommandsLen = blockCommands.size();
+            if (blockCommands.isEmpty()) {
+                sender.sendMessage(COMMANDS_EMPTY);
                 return;
             }
 
-            index = matchedCommand.getLeft();
-        }
+            BlockCommand matchedCommand;
+            try {
+                int index = Integer.parseInt(input) - 1;
+                if (index < 0) {
+                    sender.sendMessage(INDEX_TOO_SMALL);
+                    return;
+                } else if (index > currentCommandsLen) {
+                    sender.sendMessage(INDEX_TOO_LARGE.apply(currentCommandsLen));
+                }
+                matchedCommand = blockCommands.get(index);
+            } catch (NumberFormatException ex) {
+                // find an exact match of the command if possible
+                Pair<Integer, BlockCommand> matchedPair = this.findByCommand(blockCommands, input);
+                if (matchedPair == null) {
+                    sender.sendMessage(COMMAND_NOT_MATCHED.apply(input));
+                    return;
+                }
 
-        this.removeCommandAtIndex(sender, currentCommands, container, index);
+                matchedCommand = matchedPair.getRight();
+            }
+
+            this.repository.DeleteBlockCommand(matchedCommand.id());
+        });
     }
 
     @Subcommand("info")
@@ -155,71 +176,56 @@ public class BlockCommandCommand {
             return;
         }
 
-        PersistentDataContainer container = new CustomBlockData(targetBlock, this.plugin);
-        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
-        boolean cancelInteract = container.getOrDefault(this.cancelInteractDataKey, PersistentDataType.BYTE, (byte) 0) == 1;
+        this.repository.GetCustomBlock(targetBlock).thenAcceptAsync(customBlock -> {
+            if (customBlock.commands().isEmpty()) {
+                sender.sendMessage(COMMANDS_EMPTY);
+                return;
+            }
 
-        if (currentCommands.length == 0) {
-            sender.sendMessage(COMMANDS_EMPTY);
-            return;
-        }
+            Location blockLoc = targetBlock.getLocation();
+            ComponentBuilder componentBuilder = new ComponentBuilder()
+                    .append("Info for block %s (x: %s, y: %s, z: %s)".formatted(EnumUtils.friendlyName(targetBlock.getType()),
+                            blockLoc.getBlockX(), blockLoc.getBlockY(), blockLoc.getBlockZ())).color(ChatColor.GREEN)
+                    .append("\nCancel Interact: " + customBlock.settings().cancelInteract())
+                    .append("\nCommands:").color(ChatColor.GREEN);
 
-        Location blockLoc = targetBlock.getLocation();
-        ComponentBuilder componentBuilder = new ComponentBuilder()
-                .append("Info for block %s (x: %s, y: %s, z: %s)".formatted(EnumUtils.friendlyName(targetBlock.getType()),
-                        blockLoc.getBlockX(), blockLoc.getBlockY(), blockLoc.getBlockZ())).color(ChatColor.GREEN)
-                .append("\nCancel Interact: " + cancelInteract)
-                .append("\nCommands:").color(ChatColor.GREEN);
+            int i = 0;
+            for (BlockCommand command : customBlock.commands()) {
 
-        for (int i = 0; i < currentCommands.length; i++) {
-            BlockCommand command = currentCommands[i];
+                TextComponent clickHereComponent = new TextComponent("remove");
+                String clickCommand = "/blockcommand removebyid %s".formatted(command.id());
 
-            TextComponent clickHereComponent = new TextComponent("remove");
-            String clickCommand = "/blockcommand inforemove %s %s %s %s"
-                    .formatted(targetBlockLock.getBlockX(), targetBlockLock.getBlockY(), targetBlockLock.getBlockZ(), "\"%s\"".formatted(command.command()));
+                componentBuilder.append("\n")
+                        .append("%s ".formatted(i + 1))
+                        .append("[")
 
-            componentBuilder.append("\n")
-                    .append("%s ".formatted(i + 1))
-                    .append("[")
+                        .append(clickHereComponent).color(ChatColor.RED).underlined(true).event(new ClickEvent(ClickEvent.Action.RUN_COMMAND, clickCommand))
+                        .event(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(clickCommand)))
 
-                    .append(clickHereComponent).color(ChatColor.RED).underlined(true).event(new ClickEvent(ClickEvent.Action.RUN_COMMAND, clickCommand))
-                    .event(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(clickCommand)))
+                        .append("]:").reset().color(ChatColor.GREEN);
 
-                    .append("]:").reset().color(ChatColor.GREEN);
+                componentBuilder.append("\n  Command: /" + command.command())
+                        .append("\n  Click Type: " + command.clickType().friendlyName())
+                        .append("\n  Exec As: " + EnumUtils.friendlyName(command.execType()));
 
-            componentBuilder.append("\n  Command: /" + command.command())
-                    .append("\n  Click Type: " + command.clickType().friendlyName())
-                    .append("\n  Exec As: " + EnumUtils.friendlyName(command.execType()));
-        }
+                i++;
+            }
 
-        sender.spigot().sendMessage(componentBuilder.create());
+            sender.spigot().sendMessage(componentBuilder.create());
+        });
     }
 
-    @Subcommand("inforemove")
+    @Subcommand("removebyid")
     @SecretCommand
     @CommandPermission("blockcommands.command.remove")
-    public void infoRemove(@NotNull Player sender, int x, int y, int z, @NotNull String command) {
-        Block block = sender.getWorld().getBlockAt(x, y, z);
-        if (block.isEmpty()) {
-            sender.sendMessage(Chat.fmt("&cCouldn't find block at x: %s, y: %s, z: %s".formatted(x, y, z)));
-            return;
-        }
-
-        PersistentDataContainer container = new CustomBlockData(block, this.plugin);
-        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
-
-        if (currentCommands.length == 0) {
-            sender.sendMessage(COMMANDS_EMPTY);
-            return;
-        }
-
-        Pair<Integer, BlockCommand> foundCommand = this.findByCommand(currentCommands, command);
-        if (foundCommand == null) {
-            sender.sendMessage(COMMAND_NOT_MATCHED.apply(command));
-            return;
-        }
-
-        this.removeCommandAtIndex(sender, currentCommands, container, foundCommand.getLeft());
+    public void removeById(@NotNull Player sender, @NotNull UUID id) {
+        this.repository.DeleteBlockCommand(id).thenAccept(unused -> {
+            sender.sendMessage(Chat.fmt("&aSuccessfully removed command with ID &n%s&r &afrom the block.".formatted(id)));
+        }).exceptionally(throwable -> {
+            sender.sendMessage(Chat.fmt("&cFailed to remove command with ID '%s'. Check the console for more details".formatted(id)));
+            throwable.printStackTrace();
+            return null;
+        });
     }
 
     @Subcommand("set cancelinteract")
@@ -232,41 +238,49 @@ public class BlockCommandCommand {
             return;
         }
 
-        PersistentDataContainer container = new CustomBlockData(block, this.plugin);
-        BlockCommand[] currentCommands = container.getOrDefault(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, new BlockCommand[0]);
+        this.repository.UpdateBlockSettingCancelInteract(block, value).thenAccept(unused -> {
+            sender.sendMessage(Chat.fmt("&aSuccessfully set cancel interact for %s to %s.".formatted(EnumUtils.friendlyName(block.getType()), value)));
+        }).exceptionally(throwable -> {
+            sender.sendMessage(Chat.fmt("&cFailed to set cancel interact for %s. Check the console for more details".formatted(EnumUtils.friendlyName(block.getType()))));
+            throwable.printStackTrace();
+            return null;
+        });
+    }
 
-        if (currentCommands.length == 0) {
-            sender.sendMessage(NO_BOUND_COMMANDS);
+    @Subcommand("list")
+    @CommandPermission("blockcommands.command.list")
+    public void list(@NotNull Player sender, @Default("1") int page) {
+        if (page < 1) {
+            sender.sendMessage(Chat.fmt("&cPage number must be 1 or greater."));
             return;
         }
 
-        container.set(this.cancelInteractDataKey, PersistentDataType.BYTE, (byte) (value ? 1 : 0));
+        this.repository.ListAllCustomBlocks(page, 10).thenAcceptAsync(result -> {
+            if (result.isEmpty()) {
+                sender.sendMessage(Chat.fmt("&cNo block commands found."));
+                return;
+            }
 
-        String action = value ? "now" : "no longer";
-        sender.sendMessage(Chat.fmt("&a%s will %s cancel interactions.".formatted(EnumUtils.friendlyName(block.getType()), action)));
+            sender.sendMessage(Chat.fmt("&aBlock Commands (Page %s):", page));
+            for (CustomBlock customBlock : result) {
+                String commands = customBlock.commands().stream()
+                        .map(command -> "\n  - " + command.command() + " (" + command.clickType().friendlyName() + ")")
+                        .collect(Collectors.joining());
+
+                World world = Bukkit.getWorld(customBlock.worldId());
+                sender.sendMessage(Chat.fmt("&eBlock at [%s, %s, %s] in %s: %s", customBlock.x(), customBlock.y(), customBlock.z(),
+                        world == null ? "null" : world.getName(), commands));
+            }
+        }).exceptionally(throwable -> {
+            sender.sendMessage(Chat.fmt("&cFailed to list block commands. Check the console for more details"));
+            throwable.printStackTrace();
+            return null;
+        });
     }
 
-    private void removeCommandAtIndex(@NotNull Player sender, @NotNull BlockCommand[] currentCommands,
-                                      @NotNull PersistentDataContainer container, int index) {
-
-        BlockCommand removedCommand = currentCommands[index];
-        currentCommands[index] = currentCommands[currentCommands.length - 1];
-        BlockCommand[] newCommands = Arrays.copyOf(currentCommands, currentCommands.length - 1);
-
-        if (newCommands.length == 0) {
-            container.remove(this.commandDataKey);
-        } else {
-            container.set(this.commandDataKey, CustomDataTypes.BLOCK_COMMAND, newCommands);
-        }
-
-        sender.sendMessage(Chat.fmt("&aSuccessfully removed %s command &n/%s&r &afrom block. It now has %s commands",
-                removedCommand.clickType().friendlyName(), removedCommand.command(), newCommands.length));
-
-    }
-
-    private @Nullable Pair<Integer, BlockCommand> findByCommand(@NotNull BlockCommand[] commands, @NotNull String commandInput) {
-        for (int i = 0; i < commands.length; i++) {
-            BlockCommand command = commands[i];
+    private @Nullable Pair<Integer, BlockCommand> findByCommand(@NotNull List<BlockCommand> commands, @NotNull String commandInput) {
+        for (int i = 0; i < commands.size(); i++) {
+            BlockCommand command = commands.get(i);
             if (command.command().equalsIgnoreCase(commandInput)) return new Pair<>(i, command);
         }
 

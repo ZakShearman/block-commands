@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "pink.zak.minecraft.blockcommands"
-version = "1.2.0"
+version = "2.0.0"
 
 repositories {
     mavenCentral()
@@ -32,8 +32,8 @@ dependencies {
 
     compileOnly("me.clip:placeholderapi:2.11.6")
 
-    implementation("com.jeff-media:MorePersistentDataTypes:2.4.0")
-    implementation("com.jeff-media:custom-block-data:2.2.3")
+    implementation("org.xerial:sqlite-jdbc:3.49.1.0")
+    implementation("org.flywaydb:flyway-core:11.8.2")
 }
 
 val targetJavaVersion = 17
@@ -47,8 +47,14 @@ java {
 }
 
 tasks.withType<ShadowJar>().configureEach {
-    isEnableRelocation = true
-    relocationPrefix = "pink.zak.minecraft.blockcommands.shaded"
+    isEnableRelocation = false
+    val relocationBase = "pink.zak.minecraft.blockcommands.shaded"
+
+    // todo these don't actually relocate to these locations, IDK
+    relocate("org.xerial.sqlite", "$relocationBase.sqlite")
+    relocate("io.github.revxrsal", "$relocationBase.revxrsal")
+    relocate("com.jeff_media", "$relocationBase.jeffmedia")
+//    relocate("org.flywaydb", "$relocationBase.flywaydb") // if Flyway is relocated, it causes an error location the sqlite driver. IDK why
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -70,7 +76,7 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 tasks.withType<RunServer> {
-    minecraftVersion("1.21.1")
+    minecraftVersion("1.21.5")
 }
 
 tasks.withType(xyz.jpenilla.runtask.task.AbstractRun::class) {

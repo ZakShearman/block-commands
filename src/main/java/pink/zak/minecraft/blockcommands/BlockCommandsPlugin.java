@@ -1,15 +1,16 @@
 package pink.zak.minecraft.blockcommands;
 
-import com.jeff_media.customblockdata.CustomBlockData;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
-import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import pink.zak.minecraft.blockcommands.commands.BlockCommandCommand;
+import pink.zak.minecraft.blockcommands.listener.BlockBreakListener;
 import pink.zak.minecraft.blockcommands.listener.BlockClickListener;
 import pink.zak.minecraft.blockcommands.model.BlockCommand;
+import pink.zak.minecraft.blockcommands.repository.Repository;
+import pink.zak.minecraft.blockcommands.repository.SQLiteRepository;
 import revxrsal.commands.Lamp;
 import revxrsal.commands.bukkit.BukkitLamp;
 import revxrsal.commands.bukkit.actor.BukkitCommandActor;
@@ -25,18 +26,20 @@ public final class BlockCommandsPlugin extends JavaPlugin {
     private final NamespacedKey commandDataKey = new NamespacedKey(this, "blockCommandData");
     private final NamespacedKey cancelInteractDataKey = new NamespacedKey(this, "cancelInteractData");
 
+    private Repository repository;
+
     @Override
     public void onEnable() {
         PAPI_ENABLED = Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
 
+        this.repository = new SQLiteRepository(this.getClass().getClassLoader(), this.getLogger());
         this.registerCommands();
         this.registerListeners();
-        this.registerSerializers();
     }
 
     @Override
     public void onDisable() {
-        // Plugin shutdown logic
+        if (this.repository != null) this.repository.shutdown();
     }
 
     private void registerCommands() {
@@ -58,19 +61,14 @@ public final class BlockCommandsPlugin extends JavaPlugin {
                 .build();
 
         lamp.register(
-                new BlockCommandCommand(this)
+                new BlockCommandCommand(this, this.repository)
         );
     }
 
     private void registerListeners() {
         PluginManager pluginManager = this.getServer().getPluginManager();
-        pluginManager.registerEvents(new BlockClickListener(this), this);
-
-        CustomBlockData.registerListener(this);
-    }
-
-    private void registerSerializers() {
-        ConfigurationSerialization.registerClass(BlockCommand.class);
+        pluginManager.registerEvents(new BlockClickListener(this.repository), this);
+        pluginManager.registerEvents(new BlockBreakListener(this, this.repository), this);
     }
 
     public static boolean papiEnabled() {
