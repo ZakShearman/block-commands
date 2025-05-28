@@ -5,6 +5,7 @@ plugins {
     java
     id("xyz.jpenilla.run-paper") version "2.3.0"
     id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("com.github.evestera.depsize") version "0.2.0"
 }
 
 group = "pink.zak.minecraft.blockcommands"
@@ -32,7 +33,7 @@ dependencies {
 
     compileOnly("me.clip:placeholderapi:2.11.6")
 
-    implementation("org.xerial:sqlite-jdbc:3.49.1.0")
+    compileOnly("org.xerial:sqlite-jdbc:3.49.1.0")
     implementation("org.flywaydb:flyway-core:11.8.2")
 }
 
