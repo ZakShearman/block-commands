@@ -195,10 +195,22 @@ public class SQLiteRepository implements Repository {
     public CompletableFuture<CustomBlock> GetCustomBlock(int x, int y, int z, UUID worldId) {
         return CompletableFuture.supplyAsync(() -> {
             final String query = """
-                    SELECT bc.id, bc.exec_type, bc.click_type, bc.command, b.setting_cancel_interact
-                    FROM block_command bc
-                    INNER JOIN block b ON bc.pos_x = b.pos_x AND bc.pos_y = b.pos_y AND bc.pos_z = b.pos_z AND bc.world_id = b.world_id
-                    WHERE bc.pos_x = ? AND bc.pos_y = ? AND bc.pos_z = ? AND bc.world_id = ?""";
+                    SELECT
+                        -- bc parameters may be null if no commands exist for this block
+                        b.setting_cancel_interact,  -- From the block table
+                        bc.id,                      -- From block_command
+                        bc.exec_type,
+                        bc.click_type,
+                        bc.command
+                    FROM
+                        block b
+                    LEFT JOIN
+                        block_command bc ON b.pos_x = bc.pos_x
+                                        AND b.pos_y = bc.pos_y
+                                        AND b.pos_z = bc.pos_z
+                                        AND b.world_id = bc.world_id
+                    WHERE
+                        b.pos_x = ? AND b.pos_y = ? AND b.pos_z = ? AND b.world_id = ?""";
 
             try (var preparedStatement = this.connection.prepareStatement(query)) {
                 preparedStatement.setInt(1, x);
@@ -208,26 +220,37 @@ public class SQLiteRepository implements Repository {
 
                 try (var resultSet = preparedStatement.executeQuery()) {
                     List<BlockCommand> commands = new ArrayList<>();
-                    boolean settingCancelInteract = false;
+                    boolean settingCancelInteract = false; // Default value
+                    boolean blockExistsAndSettingProcessed = false;
 
                     while (resultSet.next()) {
-                        if (resultSet.isFirst()) {
+                        // Process block settings only once (from the first row, if any)
+                        if (!blockExistsAndSettingProcessed) {
+                            // If the block doesn't exist, resultSet.next() will be false,
+                            // and this block won't be entered. settingCancelInteract remains default.
                             settingCancelInteract = resultSet.getBoolean("setting_cancel_interact");
+                            blockExistsAndSettingProcessed = true;
                         }
 
-                        commands.add(new BlockCommand(
-                                UUID.fromString(resultSet.getString("id")),
-                                x, y, z, worldId,
-                                BlockCommand.ExecType.valueOf(resultSet.getString("exec_type")),
-                                BlockCommand.BlockClickType.valueOf(resultSet.getString("click_type")),
-                                resultSet.getString("command")
-                        ));
+                        // Check if command data is present (bc.id will be NULL if no matching command)
+                        String commandIdStr = resultSet.getString("id");
+                        if (commandIdStr != null) {
+                            commands.add(new BlockCommand(
+                                    UUID.fromString(commandIdStr),
+                                    x, y, z, worldId,
+                                    BlockCommand.ExecType.valueOf(resultSet.getString("exec_type")),
+                                    BlockCommand.BlockClickType.valueOf(resultSet.getString("click_type")),
+                                    resultSet.getString("command")
+                            ));
+                        }
                     }
 
                     return new CustomBlock(x, y, z, worldId, new BlockSettings(settingCancelInteract), commands);
                 }
             } catch (SQLException ex) {
-                throw new RuntimeException("Failed to get custom block", ex);
+                // Consider logging the exception with more context
+                // Logger.getLogger(getClass().getName()).log(Level.SEVERE, "Failed to get custom block", ex);
+                throw new RuntimeException("Failed to get custom block at " + x + "," + y + "," + z + " world " + worldId, ex);
             }
         });
     }
@@ -294,6 +317,18 @@ public class SQLiteRepository implements Repository {
 
     @Override
     public CompletableFuture<Void> UpdateBlockSettingCancelInteract(int x, int y, int z, String worldId, boolean cancelInteract) {
-        return null;
+        return CompletableFuture.runAsync(() -> {
+            final String query = "UPDATE block SET setting_cancel_interact = ? WHERE pos_x = ? AND pos_y = ? AND pos_z = ? AND world_id = ?";
+            try (var preparedStatement = this.connection.prepareStatement(query)) {
+                preparedStatement.setBoolean(1, cancelInteract);
+                preparedStatement.setInt(2, x);
+                preparedStatement.setInt(3, y);
+                preparedStatement.setInt(4, z);
+                preparedStatement.setString(5, worldId);
+                preparedStatement.executeUpdate();
+            } catch (SQLException ex) {
+                throw new RuntimeException("Failed to update block setting", ex);
+            }
+        });
     }
 }

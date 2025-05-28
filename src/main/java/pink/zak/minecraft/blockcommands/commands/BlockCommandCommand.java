@@ -238,6 +238,19 @@ public class BlockCommandCommand {
             return;
         }
 
+        if (block.isLiquid()) {
+            sender.sendMessage(INVALID_BLOCK);
+            return;
+        }
+
+        // Note this does not set the cancel interact setting, the next db request does.
+        this.repository.CreateDefaultCustomBlockIfNotExists(new CustomBlock(block, new BlockSettings(value), List.of()))
+                .exceptionally(throwable -> {
+                    sender.sendMessage(Chat.fmt("&cFailed to create custom block for %s. Check the console for more details".formatted(EnumUtils.friendlyName(block.getType()))));
+                    throwable.printStackTrace();
+                    return null;
+                });
+
         this.repository.UpdateBlockSettingCancelInteract(block, value).thenAccept(unused -> {
             sender.sendMessage(Chat.fmt("&aSuccessfully set cancel interact for %s to %s.".formatted(EnumUtils.friendlyName(block.getType()), value)));
         }).exceptionally(throwable -> {
