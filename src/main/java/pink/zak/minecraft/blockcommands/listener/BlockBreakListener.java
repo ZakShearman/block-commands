@@ -21,7 +21,7 @@ public class BlockBreakListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
-        // DeleteCustomBlock will result in a cascade delete of all the block_command associated with this block
+        // We must do both deletes as cascading doesn't work with SQLite
         this.repository.DeleteCustomBlock(block)
                 .exceptionally(throwable -> {
                     throwable.printStackTrace();

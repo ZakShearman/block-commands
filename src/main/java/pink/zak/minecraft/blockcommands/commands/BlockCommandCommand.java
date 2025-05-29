@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 // I hate how this is named, but I have a model called BlockCommand :\
 @Command("blockcommand")
@@ -69,6 +68,7 @@ public class BlockCommandCommand {
     @Usage("blockcommand")
     @CommandPermission("blockcommands.command")
     public void help(@NotNull Player sender) {
+        sender.sendMessage(Chat.fmt("&a/blockcommand list [page] &7- List all block commands (default page 1)"));
         sender.sendMessage(Chat.fmt("&a/blockcommand info &7- List the commands for the block you're looking at"));
         sender.sendMessage(Chat.fmt("&a/blockcommand add <console/player> <left/right_click> <command> &7- Add a command to the block you're looking at"));
         sender.sendMessage(Chat.fmt("&a/blockcommand remove <index> &7- Remove a command from the block you're looking at - get the index from /blockcommand info"));
@@ -77,8 +77,8 @@ public class BlockCommandCommand {
 
     @Subcommand("add")
     @CommandPermission("blockcommands.command.add")
-    public void add(@NotNull Player sender, @NotNull BlockCommand.ExecType execType,
-                    @NotNull BlockCommand.BlockClickType clickType, @NotNull String inputCommand) {
+    public void add(@NotNull Player sender, @Nullable BlockCommand.ExecType execType,
+                    @Nullable BlockCommand.BlockClickType clickType, @NotNull String inputCommand) {
 
         Block targetBlock = sender.getTargetBlock(null, 5);
         if (targetBlock.isEmpty()) {
@@ -88,6 +88,11 @@ public class BlockCommandCommand {
 
         if (targetBlock.isLiquid()) {
             sender.sendMessage(INVALID_BLOCK);
+            return;
+        }
+
+        if (execType == null || clickType == null) {
+            sender.sendMessage(Chat.fmt("&cIncorrect usage! /blockcommand add <console/player> <left/right_click> <command>"));
             return;
         }
 
@@ -274,16 +279,31 @@ public class BlockCommandCommand {
                 return;
             }
 
-            sender.sendMessage(Chat.fmt("&aBlock Commands (Page %s):", page));
-            for (CustomBlock customBlock : result) {
-                String commands = customBlock.commands().stream()
-                        .map(command -> "\n  - " + command.command() + " (" + command.clickType().friendlyName() + ")")
-                        .collect(Collectors.joining());
+            ComponentBuilder componentBuilder = new ComponentBuilder()
+                    .append("Block commands (Page %s):".formatted(page)).color(ChatColor.GREEN);
 
+            for (CustomBlock customBlock : result) {
                 World world = Bukkit.getWorld(customBlock.worldId());
-                sender.sendMessage(Chat.fmt("&eBlock at [%s, %s, %s] in %s: %s", customBlock.x(), customBlock.y(), customBlock.z(),
-                        world == null ? "null" : world.getName(), commands));
+                componentBuilder.append("\nBlock at [%s, %s, %s] in %s:".formatted(
+                        customBlock.x(), customBlock.y(), customBlock.z(),
+                        world != null ? world.getName() : "null"
+                )).color(ChatColor.GREEN);
+
+                for (BlockCommand command : customBlock.commands()) {
+                    String commandText = "  - %s (%s)".formatted(command.command(), command.clickType().friendlyName());
+                    componentBuilder.append("\n").append(commandText).reset().color(ChatColor.YELLOW);
+
+                    TextComponent clickHereComponent = new TextComponent("remove");
+                    String clickCommand = "/blockcommand removebyid %s".formatted(command.id());
+
+                    componentBuilder.append(" [")
+                            .append(clickHereComponent).color(ChatColor.RED).underlined(true)
+                            .event(new ClickEvent(ClickEvent.Action.RUN_COMMAND, clickCommand))
+                            .event(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(clickCommand)))
+                            .append("]").reset().color(ChatColor.YELLOW);
+                }
             }
+            sender.spigot().sendMessage(componentBuilder.create());
         }).exceptionally(throwable -> {
             sender.sendMessage(Chat.fmt("&cFailed to list block commands. Check the console for more details"));
             throwable.printStackTrace();
